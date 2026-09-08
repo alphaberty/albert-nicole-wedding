@@ -6,6 +6,7 @@
  * maths cheap, and for the modest swing angles of a chime it is visually
  * indistinguishable. The striker and the sail are chained: wind mostly pushes
  * the sail, the sail tugs the striker, and the striker knocks the tubes.
+ * Tubes also knock each other, and a fast spin flares them outward.
  */
 
 export const CHIME = {
@@ -29,7 +30,10 @@ export interface Pendulum {
   /** Effective pendulum length (pivot to centre of mass). */
   len: number
   mass: number
+  /** Linear damping. */
   damping: number
+  /** Quadratic air drag: big swings die faster than small ones. */
+  airDrag: number
   /** How strongly wind pushes this piece. */
   drag: number
 }
@@ -43,6 +47,8 @@ export interface ChimeState {
   spinVel: number
   time: number
   touching: boolean[]
+  /** Tube-pair contact flags, index i * tubeCount + j. */
+  tubeTouching: boolean[]
   accumulator: number
 }
 
@@ -58,30 +64,36 @@ export interface StepInput {
 export type StrikeHandler = (tube: number, velocity: number) => void
 
 const SUBSTEP = 1 / 120
+const N = CHIME.tubeCount
 
-function pendulum(len: number, mass: number, damping: number, drag: number): Pendulum {
-  return { x: 0, z: 0, vx: 0, vz: 0, len, mass, damping, drag }
+function pendulum(len: number, mass: number, damping: number, airDrag: number, drag: number): Pendulum {
+  return { x: 0, z: 0, vx: 0, vz: 0, len, mass, damping, airDrag, drag }
 }
 
 export function createChime(): ChimeState {
   const tubes = CHIME.tubeLengths.map((l, i) =>
-    pendulum(CHIME.stringLength + l * 0.5, 0.6 + l * 0.25, 0.42, 0.55 + (i % 2) * 0.08),
+    pendulum(CHIME.stringLength + l * 0.5, 0.6 + l * 0.25, 0.3, 0.25, 0.55 + (i % 2) * 0.08),
   )
   return {
     tubes,
-    striker: pendulum(CHIME.strikerString, 1.1, 0.5, 0.9),
-    sail: pendulum(CHIME.sailString, 0.25, 1.1, 3.6),
+    striker: pendulum(CHIME.strikerString, 1.1, 0.4, 0.3, 0.9),
+    sail: pendulum(CHIME.sailString, 0.25, 0.9, 0.8, 3.6),
     spin: 0,
     spinVel: 0,
     time: 0,
-    touching: new Array(CHIME.tubeCount).fill(false),
+    touching: new Array(N).fill(false),
+    tubeTouching: new Array(N * N).fill(false),
     accumulator: 0,
   }
 }
 
-export function tubeRestPosition(i: number): [number, number] {
-  const a = (i / CHIME.tubeCount) * Math.PI * 2 + Math.PI / 5
+const REST: [number, number][] = Array.from({ length: N }, (_, i) => {
+  const a = (i / N) * Math.PI * 2 + Math.PI / 5
   return [Math.cos(a) * CHIME.ringRadius, Math.sin(a) * CHIME.ringRadius]
+})
+
+export function tubeRestPosition(i: number): [number, number] {
+  return REST[i]
 }
 
 /** Slow, layered breeze with an occasional gust. Returns a world-space force. */
@@ -98,21 +110,64 @@ function ambientWind(t: number, strength: number): [number, number] {
 
 function integrate(p: Pendulum, ax: number, az: number, dt: number) {
   const k = CHIME.gravity / p.len
-  p.vx += (-k * p.x - p.damping * p.vx + ax) * dt
-  p.vz += (-k * p.z - p.damping * p.vz + az) * dt
+  const speed = Math.hypot(p.vx, p.vz)
+  const damp = p.damping + p.airDrag * speed
+  p.vx += (-k * p.x - damp * p.vx + ax) * dt
+  p.vz += (-k * p.z - damp * p.vz + az) * dt
   p.x += p.vx * dt
   p.z += p.vz * dt
-  const max = p.len * 0.85
+  // Strings and the canopy stop a tube swinging much past ~30°.
+  const max = p.len * 0.5
   const d = Math.hypot(p.x, p.z)
   if (d > max) {
     p.x *= max / d
     p.z *= max / d
-    p.vx *= 0.5
-    p.vz *= 0.5
+    // Bleed off the outward part of the velocity, keep the tangential part.
+    const nx = p.x / max
+    const nz = p.z / max
+    const out = p.vx * nx + p.vz * nz
+    if (out > 0) {
+      p.vx -= out * nx * 1.4
+      p.vz -= out * nz * 1.4
+    }
   }
 }
 
+/** Elastic contact between two hanging bodies at (ax, az) and (bx, bz). Returns closing speed or 0. */
+function contact(
+  a: Pendulum,
+  b: Pendulum,
+  ax: number,
+  az: number,
+  bx: number,
+  bz: number,
+  minDist: number,
+  restitution: number,
+): number {
+  const dx = bx - ax
+  const dz = bz - az
+  const d = Math.hypot(dx, dz) || 1e-6
+  if (d >= minDist) return -1
+  const nx = dx / d
+  const nz = dz / d
+  const vrel = (a.vx - b.vx) * nx + (a.vz - b.vz) * nz
+  if (vrel > 0) {
+    const j = ((1 + restitution) * vrel) / (1 / a.mass + 1 / b.mass)
+    a.vx -= (j / a.mass) * nx
+    a.vz -= (j / a.mass) * nz
+    b.vx += (j / b.mass) * nx
+    b.vz += (j / b.mass) * nz
+  }
+  const push = (minDist - d) * 0.5
+  a.x -= nx * push
+  a.z -= nz * push
+  b.x += nx * push
+  b.z += nz * push
+  return Math.max(0, vrel)
+}
+
 export function stepChime(s: ChimeState, dt: number, input: StepInput, onStrike: StrikeHandler) {
+  if (!s.tubeTouching) s.tubeTouching = new Array(N * N).fill(false)
   dt = Math.min(dt, 0.05)
   s.accumulator += dt
 
@@ -132,7 +187,7 @@ export function stepChime(s: ChimeState, dt: number, input: StepInput, onStrike:
       t.vz += iz * f
     })
   }
-  s.spinVel += input.spinImpulse
+  s.spinVel = Math.max(-5, Math.min(5, s.spinVel + input.spinImpulse))
 
   const [wxWorld, wzWorld] = ambientWind(s.time, input.ambient)
   const wx = wxWorld * cos - wzWorld * sin
@@ -142,6 +197,7 @@ export function stepChime(s: ChimeState, dt: number, input: StepInput, onStrike:
     s.accumulator -= SUBSTEP
     s.time += SUBSTEP
     const h = SUBSTEP
+    const centrifugal = Math.min(4, s.spinVel * s.spinVel) * 0.22
 
     // Sail (relative to striker) and the reaction it exerts on the striker.
     const sail = s.sail
@@ -152,47 +208,56 @@ export function stepChime(s: ChimeState, dt: number, input: StepInput, onStrike:
     integrate(sail, (wx * sail.drag) / sail.mass - striker.vx * 0.4, (wz * sail.drag) / sail.mass - striker.vz * 0.4, h)
     integrate(striker, (wx * striker.drag) / striker.mass + reactX, (wz * striker.drag) / striker.mass + reactZ, h)
 
-    for (let i = 0; i < s.tubes.length; i++) {
+    for (let i = 0; i < N; i++) {
       const t = s.tubes[i]
-      integrate(t, (wx * t.drag) / t.mass, (wz * t.drag) / t.mass, h)
+      const [rx, rz] = REST[i]
+      // Spinning flings the tubes outward from the axis.
+      const cx = (rx + t.x) * centrifugal
+      const cz = (rz + t.z) * centrifugal
+      integrate(t, (wx * t.drag) / t.mass + cx, (wz * t.drag) / t.mass + cz, h)
     }
 
     // Striker ↔ tube contacts.
-    const minDist = CHIME.tubeRadius + CHIME.strikerRadius
-    for (let i = 0; i < s.tubes.length; i++) {
+    const minStriker = CHIME.tubeRadius + CHIME.strikerRadius
+    for (let i = 0; i < N; i++) {
       const t = s.tubes[i]
-      const [rx, rz] = tubeRestPosition(i)
-      const dx = rx + t.x - striker.x
-      const dz = rz + t.z - striker.z
-      const d = Math.hypot(dx, dz) || 1e-6
-      if (d < minDist) {
-        const nx = dx / d
-        const nz = dz / d
-        const vrel = (striker.vx - t.vx) * nx + (striker.vz - t.vz) * nz
+      const [rx, rz] = REST[i]
+      const v = contact(striker, t, striker.x, striker.z, rx + t.x, rz + t.z, minStriker, 0.55)
+      if (v >= 0) {
         if (!s.touching[i]) {
           s.touching[i] = true
-          if (vrel > 0.05) onStrike(i, Math.min(1, vrel / 1.4))
+          if (v > 0.05) onStrike(i, Math.min(1, v / 1.4))
         }
-        if (vrel > 0) {
-          const e = 0.55
-          const j = ((1 + e) * vrel) / (1 / striker.mass + 1 / t.mass)
-          striker.vx -= (j / striker.mass) * nx
-          striker.vz -= (j / striker.mass) * nz
-          t.vx += (j / t.mass) * nx
-          t.vz += (j / t.mass) * nz
-        }
-        // Separate so they do not sink into each other.
-        const push = (minDist - d) * 0.5
-        striker.x -= nx * push
-        striker.z -= nz * push
-        t.x += nx * push
-        t.z += nz * push
-      } else if (d > minDist + 0.02) {
+      } else {
         s.touching[i] = false
       }
     }
 
-    s.spinVel *= Math.exp(-1.1 * h)
+    // Tube ↔ tube contacts (a softer clank on both tubes).
+    const minTube = CHIME.tubeRadius * 2 + 0.01
+    for (let i = 0; i < N; i++) {
+      for (let j = i + 1; j < N; j++) {
+        const a = s.tubes[i]
+        const b = s.tubes[j]
+        const [ax, az] = REST[i]
+        const [bx, bz] = REST[j]
+        const v = contact(a, b, ax + a.x, az + a.z, bx + b.x, bz + b.z, minTube, 0.4)
+        const key = i * N + j
+        if (v >= 0) {
+          if (!s.tubeTouching[key]) {
+            s.tubeTouching[key] = true
+            if (v > 0.08) {
+              onStrike(i, Math.min(0.7, v / 2))
+              onStrike(j, Math.min(0.5, v / 2.6))
+            }
+          }
+        } else {
+          s.tubeTouching[key] = false
+        }
+      }
+    }
+
+    s.spinVel *= Math.exp(-1.5 * h)
     s.spin += s.spinVel * h
   }
 }

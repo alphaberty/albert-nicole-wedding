@@ -48,8 +48,9 @@ class ChimeAudio {
     this.listeners.forEach((fn) => fn())
   }
 
-  /** Must be called from a user gesture (click / tap). */
+  /** Must be called from a user gesture (click / tap). Safe to call repeatedly. */
   async enable() {
+    if (this.state.enabled && this.ctx?.state === 'running') return
     backgroundMusic.start()
     if (!this.ctx) {
       const Ctor =
@@ -73,9 +74,6 @@ class ChimeAudio {
       /* ignore */
     }
     this.emit({ enabled: true, muted: false })
-    // A small greeting so guests hear that sound is on.
-    this.strike(2, 0.5)
-    window.setTimeout(() => this.strike(4, 0.35), 180)
   }
 
   toggleMute() {

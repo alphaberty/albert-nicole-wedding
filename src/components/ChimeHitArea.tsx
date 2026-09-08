@@ -36,9 +36,9 @@ export function ChimeHitArea() {
     const dy = (e.clientY - prev.y) / window.innerHeight
     if (dragging.current) {
       travelled.current += Math.abs(e.clientX - prev.x) + Math.abs(e.clientY - prev.y)
-      chimeInput.spinImpulse += dx * 10
-      chimeInput.impulseX += dx * 2.4
-      chimeInput.impulseZ += -dy * 1.4
+      chimeInput.spinImpulse += dx * 8
+      chimeInput.impulseX += dx * 1.6
+      chimeInput.impulseZ += -dy * 1.2
     } else if (e.pointerType !== 'touch') {
       // Hover: a soft gust that follows the cursor.
       chimeInput.impulseX += dx * 2.2
@@ -51,9 +51,8 @@ export function ChimeHitArea() {
       // A click rather than a drag: nudge the chime into a spin away from the click.
       const rect = e.currentTarget.getBoundingClientRect()
       const side = (e.clientX - rect.left) / rect.width < 0.5 ? -1 : 1
-      chimeInput.spinImpulse += side * 2.6
-      chimeInput.impulseX += side * 0.35
-      chimeInput.impulseZ += 0.25
+      chimeInput.spinImpulse += side * 2.2
+      chimeInput.impulseZ += 0.12
     }
     dragging.current = false
     chimeInput.dragging = false

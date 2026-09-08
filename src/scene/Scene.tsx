@@ -59,14 +59,15 @@ function layoutFor(section: number, vw: number, vh: number, pxWidth: number): La
     }
   }
 
-  // Landscape / desktop: the text column (see global.css) ends at
-  // clamp(48px, 50vw - 600px, 220px) + 600px. Everything 3D lives to its right,
-  // centred in the remaining space and scaled to fill it.
-  const columnRightPx = Math.min(pxWidth * 0.5, clamp(pxWidth / 2 - 600, 48, 220) + 600)
-  const rightFrac = columnRightPx / pxWidth
-  const centreX = ((rightFrac + 1) / 2 - 0.5) * vw
-  const availUnits = vw * (1 - rightFrac)
-  const heroScale = clamp(availUnits / 4.8, 0.8, 1.0)
+  // Landscape / desktop: a centred composition up to 1360px wide. The CSS text
+  // column starts at max(48px, 50vw - 680px) and is 600px wide; the 3D objects
+  // are centred in the rest of the composition and scaled to fill it.
+  const margin = Math.max(48, pxWidth / 2 - 680)
+  const columnRightPx = Math.min(pxWidth * 0.5, margin + 600)
+  const compositionRightPx = Math.min(pxWidth - 48, pxWidth / 2 + 680)
+  const centreX = ((columnRightPx + compositionRightPx) / 2 / pxWidth - 0.5) * vw
+  const availUnits = vw * ((compositionRightPx - columnRightPx) / pxWidth)
+  const heroScale = clamp(availUnits / 4.4, 0.8, 1.0)
   const smallScale = clamp(availUnits / 6, 0.5, 0.7)
   const corner: Placement = { x: centreX + availUnits * 0.12, y: hh * 0.9, s: smallScale, ry: 0.2 }
   const lowerLeft = { x: centreX - availUnits * 0.18, y: -hh * 0.45 }
@@ -75,10 +76,10 @@ function layoutFor(section: number, vw: number, vh: number, pxWidth: number): La
   switch (section) {
     case SECTION.landing:
       return {
-        chime: { x: centreX, y: hh * 0.87, s: heroScale },
+        chime: { x: centreX, y: hh * 0.72, s: heroScale },
         ribbon: null,
         table: null,
-        flowers: { x: centreX + availUnits * 0.34, y: -hh * 0.7, s: 0.6, rx: 0.5 },
+        flowers: { x: centreX + availUnits * 0.42, y: -hh * 0.72, s: 0.6, rx: 0.5 },
         tile: null,
       }
     case SECTION.meal:

@@ -865,40 +865,6 @@ h2:focus {
 
 /* ─── fixed controls ────────────────────────────────────── */
 
-.sound {
-  position: fixed;
-  z-index: 6;
-  top: max(14px, env(safe-area-inset-top, 0px));
-  right: 14px;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  min-width: 44px;
-  padding: 0 12px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: rgba(255, 249, 243, 0.85);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-  color: var(--red);
-  font: 500 0.8rem var(--sans);
-  letter-spacing: 0.06em;
-  cursor: pointer;
-  box-shadow: 0 10px 24px -14px rgba(90, 42, 40, 0.4);
-}
-
-.sound:focus-visible {
-  outline: 3px solid rgba(181, 154, 93, 0.7);
-}
-
-.sound--enable span {
-  text-transform: uppercase;
-}
-
-.sound[aria-pressed='false'] {
-  color: var(--muted);
-}
 
 .progress {
   position: fixed;
@@ -992,6 +958,57 @@ h2:focus {
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s;
+}
+
+/* ─── sound reminder (touch devices) ────────────────────── */
+
+.sound-hint {
+  position: fixed;
+  z-index: 6;
+  left: 50%;
+  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  transform: translate(-50%, 16px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(92vw, 420px);
+  padding: 10px 8px 10px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 249, 243, 0.92);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  color: var(--text);
+  font: 500 0.82rem var(--sans);
+  line-height: 1.3;
+  box-shadow: 0 14px 30px -16px rgba(90, 42, 40, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s var(--ease), transform 0.4s var(--ease);
+}
+
+.sound-hint svg {
+  flex: 0 0 auto;
+  color: var(--red);
+}
+
+.sound-hint.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  pointer-events: auto;
+}
+
+.sound-hint__close {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 0;
+  background: rgba(165, 45, 42, 0.08);
+  color: var(--red);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
 }
 
 /* ─── static (no-WebGL) chime ───────────────────────────── */
@@ -1097,7 +1114,8 @@ h2:focus {
     padding-bottom: 80px;
   }
   .step__inner {
-    margin-left: clamp(48px, calc(50vw - 600px), 220px);
+    /* Left column of a centred 1360px composition; the 3D objects fill the right column. */
+    margin-left: max(48px, calc(50vw - 680px));
     margin-right: auto;
     max-width: 600px;
   }
@@ -1123,7 +1141,7 @@ h2:focus {
   .chime-hit {
     top: 0;
     bottom: 0;
-    left: min(50%, calc(clamp(48px, 50vw - 600px, 220px) + 600px));
+    left: min(50%, calc(max(48px, 50vw - 680px) + 600px));
     right: 0;
     height: auto;
   }

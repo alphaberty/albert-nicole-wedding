@@ -11,45 +11,102 @@ export const COLORS = {
   text: '#342824',
 }
 
+/**
+ * Small procedural surface maps so nothing is perfectly uniform: a mottled
+ * lacquer for the blush parts, fine vertical brushing for the red tubes, and a
+ * light speckle for the gold.
+ */
+function noiseTexture(size: number, draw: (ctx: CanvasRenderingContext2D) => void, repeat = 1): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const ctx = canvas.getContext('2d')
+  if (ctx) draw(ctx)
+  const tex = new THREE.CanvasTexture(canvas)
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping
+  tex.repeat.set(repeat, repeat)
+  return tex
+}
+
+function mottle(ctx: CanvasRenderingContext2D, base: number, spread: number, grains: number, radius: number) {
+  const size = ctx.canvas.width
+  ctx.fillStyle = `rgb(${base},${base},${base})`
+  ctx.fillRect(0, 0, size, size)
+  for (let i = 0; i < grains; i++) {
+    const v = Math.round(base + (Math.random() - 0.5) * spread)
+    ctx.fillStyle = `rgba(${v},${v},${v},0.5)`
+    ctx.beginPath()
+    ctx.arc(Math.random() * size, Math.random() * size, radius * (0.5 + Math.random()), 0, Math.PI * 2)
+    ctx.fill()
+  }
+}
+
+function brushed(ctx: CanvasRenderingContext2D, base: number, spread: number) {
+  const size = ctx.canvas.width
+  ctx.fillStyle = `rgb(${base},${base},${base})`
+  ctx.fillRect(0, 0, size, size)
+  for (let x = 0; x < size; x++) {
+    const v = Math.round(base + (Math.random() - 0.5) * spread)
+    ctx.fillStyle = `rgba(${v},${v},${v},0.7)`
+    ctx.fillRect(x, 0, 1, size)
+  }
+  for (let i = 0; i < size * 2; i++) {
+    const v = Math.round(base + (Math.random() - 0.5) * spread * 1.6)
+    ctx.fillStyle = `rgba(${v},${v},${v},0.35)`
+    ctx.fillRect(Math.random() * size, Math.random() * size, 1, 6 + Math.random() * 30)
+  }
+}
+
 let cache: Record<string, THREE.Material> | null = null
 
 export function materials() {
   if (cache) return cache
+  const lacquer = noiseTexture(128, (c) => mottle(c, 150, 70, 500, 3), 2)
+  const brushedMap = noiseTexture(128, (c) => brushed(c, 110, 90), 1)
+  const goldGrain = noiseTexture(64, (c) => mottle(c, 120, 60, 200, 2), 3)
+
   cache = {
     blush: new THREE.MeshPhysicalMaterial({
       color: COLORS.blush,
-      roughness: 0.42,
+      roughness: 0.55,
+      roughnessMap: lacquer,
       metalness: 0,
-      clearcoat: 0.7,
-      clearcoatRoughness: 0.35,
-      sheen: 0.4,
+      clearcoat: 0.9,
+      clearcoatRoughness: 0.22,
+      sheen: 0.45,
+      sheenRoughness: 0.6,
       sheenColor: new THREE.Color('#ffd8e0'),
     }),
     blushMatte: new THREE.MeshStandardMaterial({ color: COLORS.blush, roughness: 0.7, metalness: 0 }),
     red: new THREE.MeshPhysicalMaterial({
       color: COLORS.red,
-      roughness: 0.3,
-      metalness: 0.12,
-      clearcoat: 0.9,
-      clearcoatRoughness: 0.18,
+      roughness: 0.42,
+      roughnessMap: brushedMap,
+      metalness: 0.4,
+      clearcoat: 1,
+      clearcoatRoughness: 0.12,
+      anisotropy: 0.65,
+      anisotropyRotation: Math.PI / 2,
     }),
     redSilk: new THREE.MeshPhysicalMaterial({
       color: COLORS.red,
-      roughness: 0.55,
+      roughness: 0.6,
+      roughnessMap: lacquer,
       metalness: 0,
       sheen: 1,
-      sheenRoughness: 0.5,
+      sheenRoughness: 0.45,
       sheenColor: new THREE.Color('#f0a0a0'),
       side: THREE.DoubleSide,
     }),
-    gold: new THREE.MeshStandardMaterial({ color: COLORS.gold, metalness: 0.95, roughness: 0.28 }),
-    goldSoft: new THREE.MeshStandardMaterial({ color: COLORS.goldDeep, metalness: 0.6, roughness: 0.45 }),
+    gold: new THREE.MeshStandardMaterial({ color: COLORS.gold, metalness: 1, roughness: 0.3, roughnessMap: goldGrain }),
+    goldSoft: new THREE.MeshStandardMaterial({ color: COLORS.goldDeep, metalness: 0.7, roughness: 0.45 }),
     ivory: new THREE.MeshPhysicalMaterial({
       color: COLORS.ivory,
-      roughness: 0.35,
+      roughness: 0.4,
+      roughnessMap: lacquer,
       metalness: 0,
-      clearcoat: 0.5,
-      clearcoatRoughness: 0.4,
+      clearcoat: 0.6,
+      clearcoatRoughness: 0.35,
     }),
   }
   return cache

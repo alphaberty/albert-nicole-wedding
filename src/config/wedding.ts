@@ -72,11 +72,10 @@ export const wedding = {
  * src to 'audio/background.mp3'. Leave src empty for no music.
  */
 export const music = {
-  src: '',
+  src: 'audio/red-rose-white-moon.mp3',
   /** 0–1. Keep it well under the chime so the tones stay audible. */
   volume: 0.3,
-  /** Shown as the sound button's tooltip when set, e.g. 'Music: Song title'. */
-  title: '',
+  title: 'Red Rose, White Moon',
 }
 
 /**

@@ -4,8 +4,9 @@ import { chimeInput, useReducedMotion, webglAvailable } from './lib/hooks'
 import { SECTION } from './scene/sections'
 import { StaticChime } from './scene/StaticChime'
 import { Botanicals } from './components/Botanicals'
-import { SoundControl } from './components/SoundControl'
+import { chimeAudio } from './lib/audio'
 import { Progress } from './components/Progress'
+import { SoundHint } from './components/SoundHint'
 import {
   AfterPartyStep,
   EmailStep,
@@ -106,6 +107,25 @@ function Experience() {
     return () => window.removeEventListener('pointermove', onMove)
   }, [])
 
+  // Sound is on by default. Browsers only allow audio after a user gesture, so
+  // it starts silently on the first tap, click or key press anywhere.
+  useEffect(() => {
+    const unlock = () => {
+      void chimeAudio.enable()
+      window.removeEventListener('pointerdown', unlock)
+      window.removeEventListener('keydown', unlock)
+      window.removeEventListener('touchend', unlock)
+    }
+    window.addEventListener('pointerdown', unlock, { passive: true })
+    window.addEventListener('keydown', unlock)
+    window.addEventListener('touchend', unlock, { passive: true })
+    return () => {
+      window.removeEventListener('pointerdown', unlock)
+      window.removeEventListener('keydown', unlock)
+      window.removeEventListener('touchend', unlock)
+    }
+  }, [])
+
   // After a confirmed save, reveal the thank-you scene and move to it.
   useEffect(() => {
     if (!success) return
@@ -137,8 +157,8 @@ function Experience() {
         )}
       </div>
       <Botanicals />
-      <SoundControl />
       <Progress active={active} goTo={goTo} />
+      <SoundHint />
 
       <main className="flow" ref={mainRef} data-typing={typing} onFocus={onFocusIn} onBlur={onFocusOut}>
         <Landing register={register(SECTION.landing)} goTo={goTo} />
