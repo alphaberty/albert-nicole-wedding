@@ -1,5 +1,7 @@
 # Albert & Nicole · 21 November 2026
 
+Live site: https://alphaberty.github.io/albert-nicole-wedding/
+
 A small guest website for the wedding: an interactive 3D wind chime on the landing page, then a short
 full-screen flow where each guest chooses a main course, says whether they are interested in an
 after-party, and leaves their name and email. Responses are saved to a Google Sheet.
