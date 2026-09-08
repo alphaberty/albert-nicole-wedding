@@ -1,4 +1,5 @@
 import { chimeAudio, useChimeAudio } from '../lib/audio'
+import { music } from '../config/wedding'
 
 function SpeakerIcon({ muted }: { muted: boolean }) {
   return (
@@ -36,7 +37,7 @@ export function SoundControl() {
       onClick={() => chimeAudio.toggleMute()}
       aria-pressed={!muted}
       aria-label={muted ? 'Sound is off. Turn sound on' : 'Sound is on. Turn sound off'}
-      title={muted ? 'Unmute' : 'Mute'}
+      title={(muted ? 'Unmute' : 'Mute') + (music.title ? ` · ${music.title}` : '')}
     >
       <SpeakerIcon muted={muted} />
     </button>

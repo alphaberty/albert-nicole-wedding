@@ -11,6 +11,16 @@ interface Props {
   ambient: number
 }
 
+// Geometry is shared between every instance of the same part so the GPU
+// uploads each shape once; segment counts are kept modest for phones.
+let blossomGeo: { centre: THREE.SphereGeometry; petal: THREE.SphereGeometry } | null = null
+function blossomGeometry() {
+  if (!blossomGeo) {
+    blossomGeo = { centre: new THREE.SphereGeometry(1, 10, 10), petal: new THREE.SphereGeometry(1, 12, 8) }
+  }
+  return blossomGeo
+}
+
 /** A small blossom: five petal ellipsoids around a gold centre. */
 export function Blossom({
   size = 0.18,
@@ -18,32 +28,93 @@ export function Blossom({
   ...props
 }: { size?: number; color?: string } & ThreeElements['group']) {
   const m = materials()
+  const geo = blossomGeometry()
   const petal = useMemo(
     () => new THREE.MeshPhysicalMaterial({ color, roughness: 0.55, clearcoat: 0.3, sheen: 0.6, sheenColor: '#ffe3ea' }),
     [color],
   )
   return (
     <group {...props}>
-      <mesh material={m.gold} castShadow>
-        <sphereGeometry args={[size * 0.3, 14, 14]} />
-      </mesh>
+      <mesh material={m.gold} geometry={geo.centre} scale={size * 0.3} castShadow />
       {[0, 1, 2, 3, 4].map((i) => {
         const a = (i / 5) * Math.PI * 2
         return (
           <mesh
             key={i}
             material={petal}
+            geometry={geo.petal}
             position={[Math.cos(a) * size * 0.62, 0, Math.sin(a) * size * 0.62]}
             rotation={[0.35 * Math.sin(a), -a, 0.35 * Math.cos(a)]}
-            scale={[1, 0.32, 0.62]}
+            scale={[size * 0.55, size * 0.55 * 0.32, size * 0.55 * 0.62]}
             castShadow
-          >
-            <sphereGeometry args={[size * 0.55, 14, 10]} />
-          </mesh>
+          />
         )
       })}
     </group>
   )
+}
+
+interface ChimeGeometry {
+  cord: THREE.CylinderGeometry
+  knot: THREE.SphereGeometry
+  knotStem: THREE.CylinderGeometry
+  disc: THREE.CylinderGeometry
+  discRing: THREE.TorusGeometry
+  discRim: THREE.TorusGeometry
+  glyphLarge: THREE.PlaneGeometry
+  glyphSmall: THREE.PlaneGeometry
+  glyphTile: THREE.PlaneGeometry
+  tubeString: THREE.CylinderGeometry
+  tubeCap: THREE.TorusGeometry
+  tubes: THREE.CylinderGeometry[]
+  tubeFoot: THREE.CylinderGeometry
+  strikerString: THREE.CylinderGeometry
+  striker: THREE.CylinderGeometry
+  strikerRim: THREE.TorusGeometry
+  sailString: THREE.CylinderGeometry
+  sail: THREE.PlaneGeometry
+  tile: THREE.CylinderGeometry
+  tileRim: THREE.TorusGeometry
+  bead: THREE.SphereGeometry
+}
+
+let chimeGeo: ChimeGeometry | null = null
+function chimeGeometry(): ChimeGeometry {
+  if (chimeGeo) return chimeGeo
+  const R = CHIME.discRadius
+  const r = CHIME.tubeRadius
+  const sail = new THREE.PlaneGeometry(0.42, 0.72, 3, 10)
+  const pos = sail.attributes.position as THREE.BufferAttribute
+  for (let i = 0; i < pos.count; i++) {
+    const y = pos.getY(i)
+    const x = pos.getX(i)
+    pos.setZ(i, Math.sin(y * 4.2) * 0.045 + Math.sin(x * 9) * 0.01)
+  }
+  sail.computeVertexNormals()
+  chimeGeo = {
+    cord: new THREE.CylinderGeometry(0.012, 0.012, 6.4, 5),
+    knot: new THREE.SphereGeometry(0.085, 12, 12),
+    knotStem: new THREE.CylinderGeometry(0.03, 0.05, 0.12, 10),
+    disc: new THREE.CylinderGeometry(R, R * 0.9, 0.16, 40),
+    discRing: new THREE.TorusGeometry(R * 0.97, 0.018, 8, 48),
+    discRim: new THREE.TorusGeometry(R * 1.005, 0.012, 6, 48),
+    glyphLarge: new THREE.PlaneGeometry(0.7, 0.7),
+    glyphSmall: new THREE.PlaneGeometry(0.32, 0.32),
+    glyphTile: new THREE.PlaneGeometry(0.22, 0.22),
+    tubeString: new THREE.CylinderGeometry(0.007, 0.007, CHIME.stringLength, 4),
+    tubeCap: new THREE.TorusGeometry(r + 0.012, 0.014, 6, 20),
+    tubes: CHIME.tubeLengths.map((len) => new THREE.CylinderGeometry(r, r, len, 16, 1)),
+    tubeFoot: new THREE.CylinderGeometry(r + 0.004, r + 0.004, 0.04, 16),
+    strikerString: new THREE.CylinderGeometry(0.008, 0.008, CHIME.strikerString, 4),
+    striker: new THREE.CylinderGeometry(CHIME.strikerRadius, CHIME.strikerRadius * 0.92, 0.09, 32),
+    strikerRim: new THREE.TorusGeometry(CHIME.strikerRadius, 0.014, 6, 36),
+    sailString: new THREE.CylinderGeometry(0.007, 0.007, CHIME.sailString - 0.4, 4),
+    sail,
+    tile: new THREE.CylinderGeometry(0.15, 0.15, 0.03, 24),
+    tileRim: new THREE.TorusGeometry(0.15, 0.008, 5, 24),
+    bead: new THREE.SphereGeometry(0.035, 8, 8),
+  }
+  return chimeGeo
 }
 
 export function WindChime({ ambient }: Props) {
@@ -53,20 +124,11 @@ export function WindChime({ ambient }: Props) {
   const strikerRef = useRef<THREE.Group>(null)
   const sailRef = useRef<THREE.Group>(null)
   const m = materials()
+  const g = chimeGeometry()
   const happy = useMemo(() => glyphTexture('囍', COLORS.red), [])
   const happyGold = useMemo(() => glyphTexture('囍', COLORS.goldDeep), [])
-
-  const sailGeometry = useMemo(() => {
-    const g = new THREE.PlaneGeometry(0.42, 0.72, 4, 14)
-    const pos = g.attributes.position as THREE.BufferAttribute
-    for (let i = 0; i < pos.count; i++) {
-      const y = pos.getY(i)
-      const x = pos.getX(i)
-      pos.setZ(i, Math.sin(y * 4.2) * 0.045 + Math.sin(x * 9) * 0.01)
-    }
-    g.computeVertexNormals()
-    return g
-  }, [])
+  const glyphRed = useMemo(() => new THREE.MeshBasicMaterial({ map: happy, transparent: true, depthWrite: false }), [happy])
+  const glyphGold = useMemo(() => new THREE.MeshBasicMaterial({ map: happyGold, transparent: true, depthWrite: false }), [happyGold])
 
   useFrame((_, delta) => {
     const s = state.current
@@ -95,11 +157,11 @@ export function WindChime({ ambient }: Props) {
       spinRef.current.rotation.x = s.striker.z * 0.05
     }
     s.tubes.forEach((t, i) => {
-      const g = tubeRefs.current[i]
-      if (!g) return
+      const tg = tubeRefs.current[i]
+      if (!tg) return
       const [rx, rz] = pendulumRotation(t)
-      g.rotation.x = rx
-      g.rotation.z = rz
+      tg.rotation.x = rx
+      tg.rotation.z = rz
     })
     if (strikerRef.current) {
       const [rx, rz] = pendulumRotation(s.striker)
@@ -115,37 +177,22 @@ export function WindChime({ ambient }: Props) {
   })
 
   const R = CHIME.discRadius
+  const str = CHIME.stringLength
 
   return (
     <group>
       {/* Hanging cord up out of view */}
-      <mesh position={[0, 3.2, 0]} material={m.gold}>
-        <cylinderGeometry args={[0.012, 0.012, 6.4, 6]} />
-      </mesh>
+      <mesh position={[0, 3.2, 0]} geometry={g.cord} material={m.gold} />
 
       <group ref={spinRef}>
-        {/* Knot and top ring */}
-        <mesh position={[0, 0.24, 0]} material={m.gold} castShadow>
-          <sphereGeometry args={[0.085, 16, 16]} />
-        </mesh>
-        <mesh position={[0, 0.16, 0]} material={m.gold}>
-          <cylinderGeometry args={[0.03, 0.05, 0.12, 12]} />
-        </mesh>
+        <mesh position={[0, 0.24, 0]} geometry={g.knot} material={m.gold} castShadow />
+        <mesh position={[0, 0.16, 0]} geometry={g.knotStem} material={m.gold} />
 
         {/* Suspension disc */}
-        <mesh material={m.blush} castShadow receiveShadow>
-          <cylinderGeometry args={[R, R * 0.9, 0.16, 56]} />
-        </mesh>
-        <mesh position={[0, 0.085, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[0.7, 0.7]} />
-          <meshBasicMaterial map={happy} transparent depthWrite={false} opacity={0.9} />
-        </mesh>
-        <mesh position={[0, -0.09, 0]} rotation={[Math.PI / 2, 0, 0]} material={m.gold}>
-          <torusGeometry args={[R * 0.97, 0.018, 10, 72]} />
-        </mesh>
-        <mesh position={[0, 0.02, 0]} rotation={[Math.PI / 2, 0, 0]} material={m.gold}>
-          <torusGeometry args={[R * 1.005, 0.012, 8, 72]} />
-        </mesh>
+        <mesh geometry={g.disc} material={m.blush} castShadow receiveShadow />
+        <mesh position={[0, 0.085, 0]} rotation={[-Math.PI / 2, 0, 0]} geometry={g.glyphLarge} material={glyphRed} />
+        <mesh position={[0, -0.09, 0]} rotation={[Math.PI / 2, 0, 0]} geometry={g.discRing} material={m.gold} />
+        <mesh position={[0, 0.02, 0]} rotation={[Math.PI / 2, 0, 0]} geometry={g.discRim} material={m.gold} />
 
         {/* Blossoms resting on the disc edge */}
         <Blossom position={[R * 0.72, 0.1, -R * 0.35]} size={0.2} />
@@ -154,7 +201,6 @@ export function WindChime({ ambient }: Props) {
         {/* Tubes */}
         {CHIME.tubeLengths.map((len, i) => {
           const [rx, rz] = tubeRestPosition(i)
-          const str = CHIME.stringLength
           return (
             <group
               key={i}
@@ -163,60 +209,32 @@ export function WindChime({ ambient }: Props) {
                 tubeRefs.current[i] = el
               }}
             >
-              <mesh position={[0, -str / 2, 0]} material={m.goldSoft}>
-                <cylinderGeometry args={[0.007, 0.007, str, 5]} />
-              </mesh>
-              <mesh position={[0, -str, 0]} rotation={[Math.PI / 2, 0, 0]} material={m.gold}>
-                <torusGeometry args={[CHIME.tubeRadius + 0.012, 0.014, 8, 28]} />
-              </mesh>
-              <mesh position={[0, -(str + len / 2), 0]} material={m.red} castShadow>
-                <cylinderGeometry args={[CHIME.tubeRadius, CHIME.tubeRadius, len, 24, 1]} />
-              </mesh>
-              <mesh position={[0, -(str + len) + 0.01, 0]} material={m.gold}>
-                <cylinderGeometry args={[CHIME.tubeRadius + 0.004, CHIME.tubeRadius + 0.004, 0.04, 24]} />
-              </mesh>
+              <mesh position={[0, -str / 2, 0]} geometry={g.tubeString} material={m.goldSoft} />
+              <mesh position={[0, -str, 0]} rotation={[Math.PI / 2, 0, 0]} geometry={g.tubeCap} material={m.gold} />
+              <mesh position={[0, -(str + len / 2), 0]} geometry={g.tubes[i]} material={m.red} castShadow />
+              <mesh position={[0, -(str + len) + 0.01, 0]} geometry={g.tubeFoot} material={m.gold} />
             </group>
           )
         })}
 
         {/* Striker and sail */}
         <group position={[0, -0.08, 0]} ref={strikerRef}>
-          <mesh position={[0, -CHIME.strikerString / 2, 0]} material={m.goldSoft}>
-            <cylinderGeometry args={[0.008, 0.008, CHIME.strikerString, 5]} />
-          </mesh>
+          <mesh position={[0, -CHIME.strikerString / 2, 0]} geometry={g.strikerString} material={m.goldSoft} />
           <group position={[0, -CHIME.strikerString, 0]}>
-            <mesh material={m.blush} castShadow>
-              <cylinderGeometry args={[CHIME.strikerRadius, CHIME.strikerRadius * 0.92, 0.09, 40]} />
-            </mesh>
-            <mesh rotation={[Math.PI / 2, 0, 0]} material={m.gold}>
-              <torusGeometry args={[CHIME.strikerRadius, 0.014, 8, 48]} />
-            </mesh>
-            <mesh position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-              <planeGeometry args={[0.32, 0.32]} />
-              <meshBasicMaterial map={happyGold} transparent depthWrite={false} />
-            </mesh>
+            <mesh geometry={g.striker} material={m.blush} castShadow />
+            <mesh rotation={[Math.PI / 2, 0, 0]} geometry={g.strikerRim} material={m.gold} />
+            <mesh position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]} geometry={g.glyphSmall} material={glyphGold} />
 
             <group ref={sailRef}>
-              <mesh position={[0, -CHIME.sailString / 2 + 0.2, 0]} material={m.goldSoft}>
-                <cylinderGeometry args={[0.007, 0.007, CHIME.sailString - 0.4, 5]} />
-              </mesh>
-              <mesh position={[0, -CHIME.sailString - 0.16, 0]} geometry={sailGeometry} material={m.redSilk} castShadow />
-              {/* Small pink tile with 囍 sitting on the sail */}
+              <mesh position={[0, -CHIME.sailString / 2 + 0.2, 0]} geometry={g.sailString} material={m.goldSoft} />
+              <mesh position={[0, -CHIME.sailString - 0.16, 0]} geometry={g.sail} material={m.redSilk} castShadow />
+              {/* Small pink tile with 囍 facing the viewer */}
               <group position={[0, -CHIME.sailString - 0.16, 0.06]}>
-                <mesh rotation={[Math.PI / 2, 0, 0]} material={m.blush}>
-                  <cylinderGeometry args={[0.15, 0.15, 0.03, 32]} />
-                </mesh>
-                <mesh rotation={[Math.PI / 2, 0, 0]} material={m.gold}>
-                  <torusGeometry args={[0.15, 0.008, 6, 32]} />
-                </mesh>
-                <mesh position={[0, 0, 0.02]}>
-                  <planeGeometry args={[0.22, 0.22]} />
-                  <meshBasicMaterial map={happy} transparent depthWrite={false} />
-                </mesh>
+                <mesh rotation={[Math.PI / 2, 0, 0]} geometry={g.tile} material={m.blush} />
+                <mesh rotation={[Math.PI / 2, 0, 0]} geometry={g.tileRim} material={m.gold} />
+                <mesh position={[0, 0, 0.02]} geometry={g.glyphTile} material={glyphRed} />
               </group>
-              <mesh position={[0, -CHIME.sailString - 0.56, 0]} material={m.gold}>
-                <sphereGeometry args={[0.035, 10, 10]} />
-              </mesh>
+              <mesh position={[0, -CHIME.sailString - 0.56, 0]} geometry={g.bead} material={m.gold} />
             </group>
           </group>
         </group>

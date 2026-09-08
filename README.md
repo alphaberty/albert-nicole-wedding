@@ -20,6 +20,7 @@ after-party, and leaves their name and email. Responses are saved to a Google Sh
 | After-party copy and optional details | `src/config/wedding.ts` → `afterParty` |
 | Date, times, venue, map link, dress code, welcome text, optional response deadline | `src/config/wedding.ts` → `wedding` |
 | Response storage endpoint | GitHub repository variable `VITE_RESPONSES_ENDPOINT` (see below) |
+| Background music (optional) | Put the track in `public/audio/`, then set `music.src` (e.g. `'audio/background.mp3'`), `music.volume`, and `music.title` in `src/config/wedding.ts` |
 
 Edit the file, commit, push to `main`. The deploy workflow rebuilds the site automatically.
 

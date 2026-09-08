@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import { backgroundMusic } from './music'
 
 /**
  * Synthesised wind-chime tones (no audio files). Each strike layers a few
@@ -49,6 +50,7 @@ class ChimeAudio {
 
   /** Must be called from a user gesture (click / tap). */
   async enable() {
+    backgroundMusic.start()
     if (!this.ctx) {
       const Ctor =
         window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
@@ -80,6 +82,7 @@ class ChimeAudio {
     if (!this.ctx || !this.master) return
     const muted = !this.state.muted
     this.master.gain.setTargetAtTime(muted ? 0 : MASTER_LEVEL, this.ctx.currentTime, 0.03)
+    backgroundMusic.setMuted(muted)
     this.emit({ muted })
   }
 

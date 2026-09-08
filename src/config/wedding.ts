@@ -67,6 +67,19 @@ export const wedding = {
 }
 
 /**
+ * Optional background music, played on loop once a guest enables sound.
+ * Put the file in public/audio/ (e.g. public/audio/background.mp3) and set
+ * src to 'audio/background.mp3'. Leave src empty for no music.
+ */
+export const music = {
+  src: '',
+  /** 0–1. Keep it well under the chime so the tones stay audible. */
+  volume: 0.3,
+  /** Shown as the sound button's tooltip when set, e.g. 'Music: Song title'. */
+  title: '',
+}
+
+/**
  * Where responses are saved. The Apps Script web-app URL is injected at build
  * time from the VITE_RESPONSES_ENDPOINT environment variable (see README).
  */

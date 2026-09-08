@@ -20,12 +20,15 @@ function Step({
   className = '',
   children,
   labelledBy,
+  overlay,
 }: {
   index: number
   register: Register
   className?: string
   children: ReactNode
   labelledBy: string
+  /** Rendered as a direct child of the section, outside the text column (e.g. the chime drag pad). */
+  overlay?: ReactNode
 }) {
   return (
     <section
@@ -34,6 +37,7 @@ function Step({
       data-index={index}
       aria-labelledby={labelledBy}
     >
+      {overlay}
       <div className="step__inner">{children}</div>
     </section>
   )
@@ -92,8 +96,7 @@ function Ornament() {
 export function Landing({ register, goTo }: StepProps) {
   const id = useId()
   return (
-    <Step index={SECTION.landing} register={register} className="step--landing" labelledBy={id}>
-      <ChimeHitArea />
+    <Step index={SECTION.landing} register={register} className="step--landing" labelledBy={id} overlay={<ChimeHitArea />}>
       <div className="landing">
         <p className="landing__glyph" aria-hidden="true">
           囍

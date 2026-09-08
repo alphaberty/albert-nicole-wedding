@@ -78,7 +78,7 @@ export function Ribbon({ color = 'red' as 'red' | 'blush' }) {
           new THREE.Vector3(1.6, 0.6, -0.25),
         ],
         0.26,
-        160,
+        110,
         2.2,
       ),
     [],
@@ -105,16 +105,16 @@ export function TableSetting() {
   return (
     <group>
       <mesh material={m.ivory} castShadow receiveShadow>
-        <cylinderGeometry args={[1, 0.92, 0.06, 64]} />
+        <cylinderGeometry args={[1, 0.92, 0.06, 40]} />
       </mesh>
       <mesh position={[0, 0.032, 0]} rotation={[Math.PI / 2, 0, 0]} material={m.gold}>
-        <torusGeometry args={[0.98, 0.012, 8, 96]} />
+        <torusGeometry args={[0.98, 0.012, 6, 64]} />
       </mesh>
       <mesh position={[0, 0.032, 0]} rotation={[Math.PI / 2, 0, 0]} material={m.gold}>
-        <torusGeometry args={[0.7, 0.008, 8, 96]} />
+        <torusGeometry args={[0.7, 0.008, 6, 64]} />
       </mesh>
       <mesh position={[0, 0.04, 0]} material={m.ivory}>
-        <cylinderGeometry args={[0.66, 0.7, 0.02, 64]} />
+        <cylinderGeometry args={[0.66, 0.7, 0.02, 40]} />
       </mesh>
       {/* Folded napkin */}
       <mesh position={[-0.05, 0.1, 0.1]} rotation={[0, 0.4, 0]} material={m.redSilk} castShadow>

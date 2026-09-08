@@ -1123,7 +1123,7 @@ h2:focus {
   .chime-hit {
     top: 0;
     bottom: 0;
-    left: 50%;
+    left: min(50%, calc(clamp(48px, 50vw - 600px, 220px) + 600px));
     right: 0;
     height: auto;
   }

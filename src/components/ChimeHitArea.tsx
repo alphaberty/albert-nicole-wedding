@@ -2,18 +2,25 @@ import { useRef } from 'react'
 import { chimeInput } from '../lib/hooks'
 
 /**
- * Invisible pad over the landing chime. Horizontal drags spin the chime and
- * pointer movement stirs the air. `touch-action: pan-y` keeps ordinary vertical
- * scrolling working on phones because the browser still owns vertical pans.
+ * Invisible pad over the landing chime.
+ *  - Moving the pointer across it stirs the air (hover).
+ *  - Dragging sideways spins the chime; dragging vertically swings it.
+ *  - A plain click nudges it into a spin in the direction of the click.
+ * `touch-action: pan-y` keeps ordinary vertical scrolling working on phones
+ * because the browser still owns vertical pans.
  */
 export function ChimeHitArea() {
-  const last = useRef<{ x: number; y: number; t: number } | null>(null)
+  const last = useRef<{ x: number; y: number } | null>(null)
+  const start = useRef<{ x: number; y: number } | null>(null)
   const dragging = useRef(false)
+  const travelled = useRef(0)
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     dragging.current = true
     chimeInput.dragging = true
-    last.current = { x: e.clientX, y: e.clientY, t: e.timeStamp }
+    last.current = { x: e.clientX, y: e.clientY }
+    start.current = { x: e.clientX, y: e.clientY }
+    travelled.current = 0
     try {
       e.currentTarget.setPointerCapture(e.pointerId)
     } catch {
@@ -23,24 +30,35 @@ export function ChimeHitArea() {
 
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const prev = last.current
-    last.current = { x: e.clientX, y: e.clientY, t: e.timeStamp }
+    last.current = { x: e.clientX, y: e.clientY }
     if (!prev) return
     const dx = (e.clientX - prev.x) / window.innerWidth
     const dy = (e.clientY - prev.y) / window.innerHeight
     if (dragging.current) {
-      chimeInput.spinImpulse += dx * 9
-      chimeInput.impulseX += dx * 2.2
-      chimeInput.impulseZ += -dy * 1.2
+      travelled.current += Math.abs(e.clientX - prev.x) + Math.abs(e.clientY - prev.y)
+      chimeInput.spinImpulse += dx * 10
+      chimeInput.impulseX += dx * 2.4
+      chimeInput.impulseZ += -dy * 1.4
     } else if (e.pointerType !== 'touch') {
-      chimeInput.impulseX += dx * 1.4
-      chimeInput.impulseZ += -dy * 0.7
+      // Hover: a soft gust that follows the cursor.
+      chimeInput.impulseX += dx * 2.2
+      chimeInput.impulseZ += -dy * 1.1
     }
   }
 
   const end = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (dragging.current && start.current && travelled.current < 8) {
+      // A click rather than a drag: nudge the chime into a spin away from the click.
+      const rect = e.currentTarget.getBoundingClientRect()
+      const side = (e.clientX - rect.left) / rect.width < 0.5 ? -1 : 1
+      chimeInput.spinImpulse += side * 2.6
+      chimeInput.impulseX += side * 0.35
+      chimeInput.impulseZ += 0.25
+    }
     dragging.current = false
     chimeInput.dragging = false
     last.current = null
+    start.current = null
     try {
       e.currentTarget.releasePointerCapture(e.pointerId)
     } catch {
