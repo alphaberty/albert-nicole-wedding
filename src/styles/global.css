@@ -663,6 +663,10 @@ h2:focus {
   display: none;
 }
 
+.nav__status .subtext {
+  margin: 0 0 12px;
+}
+
 .error {
   margin: 0 0 12px;
   padding: 12px 14px;

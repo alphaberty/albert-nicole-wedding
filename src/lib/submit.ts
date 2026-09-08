@@ -30,7 +30,8 @@ export class SubmitError extends Error {
   }
 }
 
-const TIMEOUT_MS = 20000
+// Apps Script cold starts can take 15–30 s; retries are safe thanks to the submission id.
+const TIMEOUT_MS = 45000
 
 export async function submitResponse(payload: ResponsePayload, endpoint: string): Promise<SubmitResult> {
   if (!endpoint) {

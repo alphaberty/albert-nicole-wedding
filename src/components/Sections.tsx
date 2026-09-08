@@ -424,6 +424,16 @@ export function ReviewStep({ register, goTo }: StepProps) {
   const id = useId()
   const option = menu.options.find((o) => o.id === draft.mainCourse)
   const busy = status === 'submitting'
+  const [slow, setSlow] = useState(false)
+
+  useEffect(() => {
+    if (!busy) {
+      setSlow(false)
+      return
+    }
+    const t = window.setTimeout(() => setSlow(true), 6000)
+    return () => window.clearTimeout(t)
+  }, [busy])
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -478,6 +488,7 @@ export function ReviewStep({ register, goTo }: StepProps) {
         {wedding.responseDeadline && <p className="subtext">{wedding.responseDeadline}</p>}
         <div className="nav">
           <div className="nav__status" aria-live="polite">
+            {busy && slow && <p className="subtext">Still saving. This can take up to half a minute the first time.</p>}
             {(localError || error) && (
               <p className="error" role="alert">
                 {localError || error}
