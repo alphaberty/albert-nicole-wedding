@@ -34,6 +34,8 @@ jobs:
           VITE_BASE_PATH: ${{ steps.base.outputs.path }}
           VITE_RESPONSES_ENDPOINT: ${{ vars.VITE_RESPONSES_ENDPOINT }}
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
