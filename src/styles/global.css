@@ -947,7 +947,7 @@ h2:focus {
 
 .progress__label {
   position: absolute;
-  right: 30px;
+  right: 40px;
   top: 50%;
   transform: translateY(-50%);
   white-space: nowrap;
@@ -1144,7 +1144,7 @@ h2:focus {
     transform: translateY(-50%) translateX(6px);
     flex-direction: column;
     padding: 14px 8px;
-    gap: 12px;
+    gap: 16px;
     border-radius: 24px;
     background: rgba(255, 249, 243, 0.6);
   }

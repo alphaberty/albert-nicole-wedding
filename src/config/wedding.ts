@@ -19,8 +19,8 @@ export const menu = {
   question: 'What would you like for dinner?',
   hint: 'Choose one main course. You can change your mind until you submit.',
   options: [
-    { id: 'A', name: 'Option A', description: 'Details to be announced' },
-    { id: 'B', name: 'Option B', description: 'Details to be announced' },
+    { id: 'A', name: 'Oven Baked Saikyo Miso Black Cod', description: '' },
+    { id: 'B', name: 'Grilled Pork Collar', description: '' },
   ] satisfies MenuOption[],
   dietaryLabel: 'Dietary requirements or allergies',
   dietaryPlaceholder: 'e.g. no shellfish, vegetarian, nut allergy',
@@ -74,7 +74,7 @@ export const wedding = {
 export const music = {
   src: 'audio/red-rose-white-moon.mp3',
   /** 0–1. Keep it well under the chime so the tones stay audible. */
-  volume: 0.3,
+  volume: 0.18,
   title: 'Red Rose, White Moon',
 }
 

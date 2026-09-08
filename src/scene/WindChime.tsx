@@ -138,8 +138,14 @@ export function WindChime({ ambient }: Props) {
   const state = useRef(createChime())
   const spinRef = useRef<THREE.Group>(null)
   const tubeRefs = useRef<(THREE.Group | null)[]>([])
+  const tubeBodyRefs = useRef<(THREE.Group | null)[]>([])
   const strikerRef = useRef<THREE.Group>(null)
+  const strikerBodyRef = useRef<THREE.Group>(null)
   const sailRef = useRef<THREE.Group>(null)
+  const sailBodyRef = useRef<THREE.Group>(null)
+  // Smoothed thread angles: a light thread follows the body it carries with a
+  // little lag and never tilts as far as the body does.
+  const threads = useRef({ tubes: CHIME.tubeLengths.map(() => [0, 0]), striker: [0, 0], sail: [0, 0] })
   const m = materials()
   const g = chimeGeometry()
   const happy = useMemo(() => glyphTexture('囍', COLORS.red), [])
@@ -173,23 +179,43 @@ export function WindChime({ ambient }: Props) {
       spinRef.current.rotation.z = -s.striker.x * 0.05
       spinRef.current.rotation.x = s.striker.z * 0.05
     }
-    s.tubes.forEach((t, i) => {
-      const tg = tubeRefs.current[i]
-      if (!tg) return
-      const [rx, rz] = pendulumRotation(t)
-      tg.rotation.x = rx
-      tg.rotation.z = rz
-    })
-    if (strikerRef.current) {
-      const [rx, rz] = pendulumRotation(s.striker)
-      strikerRef.current.rotation.x = rx
-      strikerRef.current.rotation.z = rz
+    // Thread follows the body: a fraction of the body angle, eased over ~80 ms.
+    const follow = 1 - Math.exp(-Math.min(delta, 0.1) * 12)
+    const split = (
+      thread: number[],
+      rx: number,
+      rz: number,
+      share: number,
+      pivot: THREE.Group | null,
+      body: THREE.Group | null,
+    ) => {
+      thread[0] += (rx * share - thread[0]) * follow
+      thread[1] += (rz * share - thread[1]) * follow
+      if (pivot) {
+        pivot.rotation.x = thread[0]
+        pivot.rotation.z = thread[1]
+      }
+      if (body) {
+        body.rotation.x = rx - thread[0]
+        body.rotation.z = rz - thread[1]
+      }
     }
-    if (sailRef.current) {
+    const th = threads.current
+    s.tubes.forEach((t, i) => {
+      const [rx, rz] = pendulumRotation(t)
+      split(th.tubes[i], rx, rz, 0.55, tubeRefs.current[i], tubeBodyRefs.current[i])
+    })
+    {
+      const [rx, rz] = pendulumRotation(s.striker)
+      split(th.striker, rx, rz, 0.7, strikerRef.current, strikerBodyRef.current)
+    }
+    {
       const [rx, rz] = pendulumRotation(s.sail)
-      sailRef.current.rotation.x = rx
-      sailRef.current.rotation.z = rz
-      sailRef.current.rotation.y = s.sail.x * 0.6
+      split(th.sail, rx, rz, 0.5, sailRef.current, sailBodyRef.current)
+      if (sailBodyRef.current) {
+        // A paper sail twists a little in the air rather than staying flat.
+        sailBodyRef.current.rotation.y = Math.sin(s.time * 1.3) * 0.12 + s.sail.x * 0.35
+      }
     }
   })
 
@@ -232,9 +258,16 @@ export function WindChime({ ambient }: Props) {
               }}
             >
               <mesh position={[0, -str / 2, 0]} geometry={g.tubeString} material={m.goldSoft} />
-              <mesh position={[0, -str, 0]} rotation={[Math.PI / 2, 0, 0]} geometry={g.tubeCap} material={m.gold} />
-              <mesh position={[0, -(str + len / 2), 0]} geometry={g.tubes[i]} material={m.red} castShadow />
-              <mesh position={[0, -(str + len) + 0.01, 0]} geometry={g.tubeFoot} material={m.gold} />
+              <group
+                position={[0, -str, 0]}
+                ref={(el) => {
+                  tubeBodyRefs.current[i] = el
+                }}
+              >
+                <mesh rotation={[Math.PI / 2, 0, 0]} geometry={g.tubeCap} material={m.gold} />
+                <mesh position={[0, -len / 2, 0]} geometry={g.tubes[i]} material={m.red} castShadow />
+                <mesh position={[0, -len + 0.01, 0]} geometry={g.tubeFoot} material={m.gold} />
+              </group>
             </group>
           )
         })}
@@ -242,21 +275,23 @@ export function WindChime({ ambient }: Props) {
         {/* Striker and sail */}
         <group position={[0, -0.16, 0]} ref={strikerRef}>
           <mesh position={[0, -CHIME.strikerString / 2, 0]} geometry={g.strikerString} material={m.goldSoft} />
-          <group position={[0, -CHIME.strikerString, 0]}>
+          <group position={[0, -CHIME.strikerString, 0]} ref={strikerBodyRef}>
             <mesh geometry={g.striker} material={m.blush} castShadow />
             <mesh rotation={[Math.PI / 2, 0, 0]} geometry={g.strikerRim} material={m.gold} />
             <mesh position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]} geometry={g.glyphSmall} material={glyphGold} />
 
             <group ref={sailRef}>
               <mesh position={[0, -CHIME.sailString / 2 + 0.2, 0]} geometry={g.sailString} material={m.goldSoft} />
-              <mesh position={[0, -CHIME.sailString - 0.16, 0]} geometry={g.sail} material={m.redSilk} castShadow />
-              {/* Small pink tile with 囍 facing the viewer */}
-              <group position={[0, -CHIME.sailString - 0.16, 0.06]}>
-                <mesh rotation={[Math.PI / 2, 0, 0]} geometry={g.tile} material={m.blush} />
-                <mesh rotation={[Math.PI / 2, 0, 0]} geometry={g.tileRim} material={m.gold} />
-                <mesh position={[0, 0, 0.02]} geometry={g.glyphTile} material={glyphRed} />
+              <group position={[0, -CHIME.sailString + 0.2, 0]} ref={sailBodyRef}>
+                <mesh position={[0, -0.36, 0]} geometry={g.sail} material={m.redSilk} castShadow />
+                {/* Small pink tile with 囍 facing the viewer */}
+                <group position={[0, -0.36, 0.06]}>
+                  <mesh rotation={[Math.PI / 2, 0, 0]} geometry={g.tile} material={m.blush} />
+                  <mesh rotation={[Math.PI / 2, 0, 0]} geometry={g.tileRim} material={m.gold} />
+                  <mesh position={[0, 0, 0.02]} geometry={g.glyphTile} material={glyphRed} />
+                </group>
+                <mesh position={[0, -0.76, 0]} geometry={g.bead} material={m.gold} />
               </group>
-              <mesh position={[0, -CHIME.sailString - 0.56, 0]} geometry={g.bead} material={m.gold} />
             </group>
           </group>
         </group>

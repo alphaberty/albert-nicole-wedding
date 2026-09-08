@@ -77,7 +77,7 @@ export function createChime(): ChimeState {
   return {
     tubes,
     striker: pendulum(CHIME.strikerString, 1.1, 0.4, 0.3, 0.9),
-    sail: pendulum(CHIME.sailString, 0.25, 0.9, 0.8, 3.6),
+    sail: pendulum(CHIME.sailString, 0.25, 1.6, 1.4, 2.4),
     spin: 0,
     spinVel: 0,
     time: 0,

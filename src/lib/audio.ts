@@ -20,7 +20,7 @@ const PARTIALS = [
   { ratio: 5.4, gain: 0.1, decay: 0.8 },
   { ratio: 8.93, gain: 0.04, decay: 0.45 },
 ]
-const MASTER_LEVEL = 0.38
+const MASTER_LEVEL = 0.75
 const MAX_VOICES = 6
 const GLOBAL_MIN_GAP = 0.06
 const TUBE_MIN_GAP = 0.16
@@ -28,6 +28,8 @@ const TUBE_MIN_GAP = 0.16
 class ChimeAudio {
   private ctx: AudioContext | null = null
   private master: GainNode | null = null
+  /** Keeps the media-element sink alive (see enable()). */
+  private sink: HTMLAudioElement | null = null
   private listeners = new Set<() => void>()
   private state: AudioState = { enabled: false, muted: false }
   private lastStrike = -1
@@ -66,7 +68,7 @@ class ChimeAudio {
       this.master = this.ctx.createGain()
       this.master.gain.value = MASTER_LEVEL
       this.master.connect(compressor)
-      compressor.connect(this.ctx.destination)
+      this.route(compressor)
     }
     try {
       await this.ctx.resume()
@@ -76,10 +78,45 @@ class ChimeAudio {
     this.emit({ enabled: true, muted: false })
   }
 
+  /**
+   * Play the synthesised chimes through a media element rather than straight
+   * to the context output. On iPhones the ring/silent switch mutes plain Web
+   * Audio but not media playback, so without this the background track would
+   * play while the chimes vanished. Falls back to the direct output if the
+   * element refuses to play.
+   */
+  private route(node: AudioNode) {
+    const ctx = this.ctx
+    if (!ctx || typeof ctx.createMediaStreamDestination !== 'function') {
+      node.connect(ctx!.destination)
+      return
+    }
+    try {
+      const streamOut = ctx.createMediaStreamDestination()
+      const el = new Audio()
+      el.srcObject = streamOut.stream
+      el.setAttribute('playsinline', '')
+      node.connect(streamOut)
+      this.sink = el
+      el.play().catch(() => {
+        try {
+          node.disconnect(streamOut)
+        } catch {
+          /* ignore */
+        }
+        node.connect(ctx.destination)
+        this.sink = null
+      })
+    } catch {
+      node.connect(ctx.destination)
+    }
+  }
+
   toggleMute() {
     if (!this.ctx || !this.master) return
     const muted = !this.state.muted
     this.master.gain.setTargetAtTime(muted ? 0 : MASTER_LEVEL, this.ctx.currentTime, 0.03)
+    if (this.sink) this.sink.muted = muted
     backgroundMusic.setMuted(muted)
     this.emit({ muted })
   }
@@ -101,10 +138,11 @@ class ChimeAudio {
     this.lastStrike = now
     this.lastTubeStrike[tube] = now
     this.activeVoices += 1
+    backgroundMusic.duck(velocity)
 
     const base = TUBE_FREQUENCIES[tube % TUBE_FREQUENCIES.length]
     const v = Math.min(1, Math.max(0, velocity))
-    const level = 0.06 + 0.3 * v
+    const level = 0.1 + 0.4 * v
     const voice = ctx.createGain()
     voice.gain.value = 1
     voice.connect(master)
