@@ -36,9 +36,9 @@ export function ChimeHitArea() {
     const dy = (e.clientY - prev.y) / window.innerHeight
     if (dragging.current) {
       travelled.current += Math.abs(e.clientX - prev.x) + Math.abs(e.clientY - prev.y)
-      chimeInput.spinImpulse += dx * 8
-      chimeInput.impulseX += dx * 1.6
-      chimeInput.impulseZ += -dy * 1.2
+      chimeInput.spinImpulse += dx * 5
+      chimeInput.impulseX += dx * 2.4
+      chimeInput.impulseZ += -dy * 1.8
     } else if (e.pointerType !== 'touch') {
       // Hover: a soft gust that follows the cursor.
       chimeInput.impulseX += dx * 2.2
@@ -48,11 +48,12 @@ export function ChimeHitArea() {
 
   const end = (e: React.PointerEvent<HTMLDivElement>) => {
     if (dragging.current && start.current && travelled.current < 8) {
-      // A click rather than a drag: nudge the chime into a spin away from the click.
+      // A click rather than a drag: push the whole chime away from the click so it sways, with a little spin.
       const rect = e.currentTarget.getBoundingClientRect()
       const side = (e.clientX - rect.left) / rect.width < 0.5 ? -1 : 1
-      chimeInput.spinImpulse += side * 2.2
-      chimeInput.impulseZ += 0.12
+      chimeInput.impulseX += side * 1.1
+      chimeInput.impulseZ += 0.2
+      chimeInput.spinImpulse += side * 0.7
     }
     dragging.current = false
     chimeInput.dragging = false

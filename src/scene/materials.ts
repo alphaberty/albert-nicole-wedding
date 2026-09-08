@@ -133,6 +133,47 @@ export function glyphTexture(glyph: string, color: string, size = 256): THREE.Ca
 }
 
 /**
+ * Lettering for a plaque: a portrait texture (aspect = width / height) with
+ * CJK or Hangul text stacked vertically and Latin text set horizontally.
+ */
+export function labelTexture(text: string, color: string, aspect: number, height = 512): THREE.CanvasTexture {
+  const w = Math.round(height * aspect)
+  const canvas = document.createElement('canvas')
+  canvas.width = w
+  canvas.height = height
+  const ctx = canvas.getContext('2d')
+  if (ctx) {
+    ctx.clearRect(0, 0, w, height)
+    ctx.fillStyle = color
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    const family = '"Songti SC", "Noto Serif CJK SC", "Noto Serif CJK JP", "Noto Serif CJK KR", "Yu Mincho", "PingFang SC", "Batang", "Microsoft YaHei", Georgia, serif'
+    const cjk = /[ᄀ-ᇿ　-鿿가-힯豈-﫿]/.test(text)
+    if (cjk) {
+      const chars = Array.from(text)
+      const size = Math.min(w * 0.82, (height * 0.9) / chars.length)
+      ctx.font = `${Math.round(size)}px ${family}`
+      const total = size * chars.length * 1.05
+      chars.forEach((ch, i) => {
+        ctx.fillText(ch, w / 2, height / 2 - total / 2 + size * 1.05 * (i + 0.5))
+      })
+    } else {
+      let size = Math.round(w * 0.6)
+      ctx.font = `italic ${size}px "Cormorant Garamond", Georgia, serif`
+      while (size > 10 && ctx.measureText(text).width > w * 0.85) {
+        size -= 4
+        ctx.font = `italic ${size}px "Cormorant Garamond", Georgia, serif`
+      }
+      ctx.fillText(text, w / 2, height / 2)
+    }
+  }
+  const tex = new THREE.CanvasTexture(canvas)
+  tex.colorSpace = THREE.SRGBColorSpace
+  tex.anisotropy = 4
+  return tex
+}
+
+/**
  * Flat silk ribbon following a curve. Two vertices per sample, offset along a
  * gently twisting normal so the ribbon catches light along its length.
  */

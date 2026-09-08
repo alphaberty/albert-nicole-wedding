@@ -1,24 +1,37 @@
 /**
- * A small, self-contained simulation of a hanging wind chime.
+ * A small, self-contained simulation of a hanging chime.
  *
  * Every hanging piece is a damped pendulum, tracked as the horizontal
  * displacement of its lower end (x, z) rather than as angles. That keeps the
  * maths cheap, and for the modest swing angles of a chime it is visually
- * indistinguishable. The striker and the sail are chained: wind mostly pushes
- * the sail, the sail tugs the striker, and the striker knocks the tubes.
- * Tubes also knock each other, and a fast spin flares them outward.
+ * indistinguishable.
+ *
+ *  - The whole chime hangs from a pivot on its cord and sways as one body.
+ *    When it accelerates, everything hanging from it lags behind by inertia.
+ *  - Five lettered plaques hang from the canopy; a striker in the middle
+ *    knocks them, they knock each other, and each twists on its thread.
+ *  - A ring of small pendants around the rim swings fast and light.
+ *  - Wind mostly pushes the paper sail, the sail tugs the striker.
  */
 
 export const CHIME = {
-  tubeCount: 5,
-  ringRadius: 0.62,
-  tubeRadius: 0.075,
-  tubeLengths: [2.15, 1.7, 1.95, 1.5, 2.35],
-  stringLength: 0.55,
+  plaqueCount: 5,
+  ringRadius: 0.66,
+  /** Half-width used for plaque contacts. */
+  plaqueRadius: 0.24,
+  plaqueHeights: [1.25, 0.95, 1.12, 0.85, 1.35],
+  plaqueWidths: [0.5, 0.44, 0.48, 0.42, 0.54],
+  stringLength: 0.5,
   strikerRadius: 0.3,
-  strikerString: 1.42,
+  /** Longer than the plaques' pendulums so it swings out of phase and meets them. */
+  strikerString: 1.3,
   sailString: 0.72,
   discRadius: 0.95,
+  pendantCount: 8,
+  pendantRadius: 0.86,
+  pendantString: 0.32,
+  /** The cord pivot sits this far above the canopy; the whole chime swings about it. */
+  pivotHeight: 2.6,
   gravity: 9.81,
 }
 
@@ -36,10 +49,22 @@ export interface Pendulum {
   airDrag: number
   /** How strongly wind pushes this piece. */
   drag: number
+  /** Swing limit as a fraction of length. */
+  limit: number
+}
+
+export interface Twist {
+  a: number
+  v: number
 }
 
 export interface ChimeState {
-  tubes: Pendulum[]
+  /** Sway of the whole chime about the cord pivot (world frame). */
+  body: Pendulum
+  plaques: Pendulum[]
+  twists: Twist[]
+  pendants: Pendulum[]
+  pendantTwists: Twist[]
   striker: Pendulum
   /** Displacement relative to the striker. */
   sail: Pendulum
@@ -47,8 +72,7 @@ export interface ChimeState {
   spinVel: number
   time: number
   touching: boolean[]
-  /** Tube-pair contact flags, index i * tubeCount + j. */
-  tubeTouching: boolean[]
+  pairTouching: boolean[]
   accumulator: number
 }
 
@@ -61,28 +85,34 @@ export interface StepInput {
   ambient: number
 }
 
-export type StrikeHandler = (tube: number, velocity: number) => void
+export type StrikeHandler = (plaque: number, velocity: number) => void
 
 const SUBSTEP = 1 / 120
-const N = CHIME.tubeCount
+const N = CHIME.plaqueCount
+const P = CHIME.pendantCount
 
-function pendulum(len: number, mass: number, damping: number, airDrag: number, drag: number): Pendulum {
-  return { x: 0, z: 0, vx: 0, vz: 0, len, mass, damping, airDrag, drag }
+function pendulum(len: number, mass: number, damping: number, airDrag: number, drag: number, limit = 0.5): Pendulum {
+  return { x: 0, z: 0, vx: 0, vz: 0, len, mass, damping, airDrag, drag, limit }
 }
 
 export function createChime(): ChimeState {
-  const tubes = CHIME.tubeLengths.map((l, i) =>
-    pendulum(CHIME.stringLength + l * 0.5, 0.6 + l * 0.25, 0.3, 0.25, 0.55 + (i % 2) * 0.08),
-  )
   return {
-    tubes,
-    striker: pendulum(CHIME.strikerString, 1.1, 0.4, 0.3, 0.9),
-    sail: pendulum(CHIME.sailString, 0.25, 1.6, 1.4, 2.4),
+    body: pendulum(CHIME.pivotHeight, 6, 0.55, 0.15, 1.4, 0.32),
+    plaques: CHIME.plaqueHeights.map((h, i) =>
+      pendulum(CHIME.stringLength + h * 0.5, 0.5 + h * 0.3, 0.32, 0.3, 0.7 + (i % 2) * 0.1),
+    ),
+    twists: CHIME.plaqueHeights.map(() => ({ a: 0, v: 0 })),
+    pendants: Array.from({ length: P }, (_, i) =>
+      pendulum(CHIME.pendantString + 0.08, 0.05, 1.1, 0.6, 0.6 + (i % 3) * 0.15, 0.7),
+    ),
+    pendantTwists: Array.from({ length: P }, () => ({ a: 0, v: 0 })),
+    striker: pendulum(CHIME.strikerString, 1.1, 0.35, 0.25, 1.1),
+    sail: pendulum(CHIME.sailString, 0.25, 1.6, 1.4, 2.6, 0.4),
     spin: 0,
     spinVel: 0,
     time: 0,
     touching: new Array(N).fill(false),
-    tubeTouching: new Array(N * N).fill(false),
+    pairTouching: new Array(N * N).fill(false),
     accumulator: 0,
   }
 }
@@ -91,9 +121,16 @@ const REST: [number, number][] = Array.from({ length: N }, (_, i) => {
   const a = (i / N) * Math.PI * 2 + Math.PI / 5
   return [Math.cos(a) * CHIME.ringRadius, Math.sin(a) * CHIME.ringRadius]
 })
+const PENDANT_REST: [number, number][] = Array.from({ length: P }, (_, i) => {
+  const a = (i / P) * Math.PI * 2 + Math.PI / 8
+  return [Math.cos(a) * CHIME.pendantRadius, Math.sin(a) * CHIME.pendantRadius]
+})
 
-export function tubeRestPosition(i: number): [number, number] {
+export function plaqueRestPosition(i: number): [number, number] {
   return REST[i]
+}
+export function pendantRestPosition(i: number): [number, number] {
+  return PENDANT_REST[i]
 }
 
 /** Slow, layered breeze with an occasional gust. Returns a world-space force. */
@@ -116,13 +153,11 @@ function integrate(p: Pendulum, ax: number, az: number, dt: number) {
   p.vz += (-k * p.z - damp * p.vz + az) * dt
   p.x += p.vx * dt
   p.z += p.vz * dt
-  // Strings and the canopy stop a tube swinging much past ~30°.
-  const max = p.len * 0.5
+  const max = p.len * p.limit
   const d = Math.hypot(p.x, p.z)
   if (d > max) {
     p.x *= max / d
     p.z *= max / d
-    // Bleed off the outward part of the velocity, keep the tangential part.
     const nx = p.x / max
     const nz = p.z / max
     const out = p.vx * nx + p.vz * nz
@@ -133,7 +168,12 @@ function integrate(p: Pendulum, ax: number, az: number, dt: number) {
   }
 }
 
-/** Elastic contact between two hanging bodies at (ax, az) and (bx, bz). Returns closing speed or 0. */
+function twistStep(t: Twist, torque: number, dt: number, k = 14, c = 2.2) {
+  t.v += (-k * t.a - c * t.v + torque) * dt
+  t.a += t.v * dt
+}
+
+/** Elastic contact between two hanging bodies. Returns closing speed, or -1 when apart. */
 function contact(
   a: Pendulum,
   b: Pendulum,
@@ -167,22 +207,29 @@ function contact(
 }
 
 export function stepChime(s: ChimeState, dt: number, input: StepInput, onStrike: StrikeHandler) {
-  if (!s.tubeTouching) s.tubeTouching = new Array(N * N).fill(false)
   dt = Math.min(dt, 0.05)
   s.accumulator += dt
 
-  // Impulses are applied once, converted to velocity in the chime's own frame.
+  // Impulses (world frame) reach the body directly and the hanging pieces in
+  // the chime's own rotating frame.
   const cos = Math.cos(-s.spin)
   const sin = Math.sin(-s.spin)
   const ix = input.impulseX * cos - input.impulseZ * sin
   const iz = input.impulseX * sin + input.impulseZ * cos
-  if (ix !== 0 || iz !== 0) {
-    s.sail.vx += ix * 1.6
-    s.sail.vz += iz * 1.6
-    s.striker.vx += ix * 0.7
-    s.striker.vz += iz * 0.7
-    s.tubes.forEach((t, i) => {
-      const f = 0.35 + 0.1 * Math.sin(i * 1.7)
+  if (input.impulseX !== 0 || input.impulseZ !== 0) {
+    s.body.vx += input.impulseX * 0.9
+    s.body.vz += input.impulseZ * 0.9
+    s.sail.vx += ix * 1.2
+    s.sail.vz += iz * 1.2
+    s.striker.vx += ix * 0.5
+    s.striker.vz += iz * 0.5
+    s.plaques.forEach((t, i) => {
+      const f = 0.25 + 0.1 * Math.sin(i * 1.7)
+      t.vx += ix * f
+      t.vz += iz * f
+    })
+    s.pendants.forEach((t, i) => {
+      const f = 0.5 + 0.2 * Math.sin(i * 2.3)
       t.vx += ix * f
       t.vz += iz * f
     })
@@ -199,60 +246,93 @@ export function stepChime(s: ChimeState, dt: number, input: StepInput, onStrike:
     const h = SUBSTEP
     const centrifugal = Math.min(4, s.spinVel * s.spinVel) * 0.22
 
+    // Whole-chime sway, then the inertial push it gives everything below.
+    const body = s.body
+    const bvx = body.vx
+    const bvz = body.vz
+    integrate(body, (wxWorld * body.drag) / body.mass, (wzWorld * body.drag) / body.mass, h)
+    const baxWorld = (body.vx - bvx) / h
+    const bazWorld = (body.vz - bvz) / h
+    const bax = -(baxWorld * cos - bazWorld * sin) * 0.85
+    const baz = -(baxWorld * sin + bazWorld * cos) * 0.85
+
     // Sail (relative to striker) and the reaction it exerts on the striker.
     const sail = s.sail
     const striker = s.striker
     const kSail = CHIME.gravity / sail.len
     const reactX = (kSail * sail.x * sail.mass) / striker.mass
     const reactZ = (kSail * sail.z * sail.mass) / striker.mass
-    integrate(sail, (wx * sail.drag) / sail.mass - striker.vx * 0.4, (wz * sail.drag) / sail.mass - striker.vz * 0.4, h)
-    integrate(striker, (wx * striker.drag) / striker.mass + reactX, (wz * striker.drag) / striker.mass + reactZ, h)
+    integrate(
+      sail,
+      (wx * sail.drag) / sail.mass - striker.vx * 0.4 + bax,
+      (wz * sail.drag) / sail.mass - striker.vz * 0.4 + baz,
+      h,
+    )
+    integrate(
+      striker,
+      (wx * striker.drag) / striker.mass + reactX + bax,
+      (wz * striker.drag) / striker.mass + reactZ + baz,
+      h,
+    )
 
     for (let i = 0; i < N; i++) {
-      const t = s.tubes[i]
+      const t = s.plaques[i]
       const [rx, rz] = REST[i]
-      // Spinning flings the tubes outward from the axis.
       const cx = (rx + t.x) * centrifugal
       const cz = (rz + t.z) * centrifugal
-      integrate(t, (wx * t.drag) / t.mass + cx, (wz * t.drag) / t.mass + cz, h)
+      integrate(t, (wx * t.drag) / t.mass + cx + bax, (wz * t.drag) / t.mass + cz + baz, h)
+      // Flat plaques twist on their thread when the air hits them side-on.
+      twistStep(s.twists[i], (wx * Math.cos(i * 1.3) - wz * Math.sin(i * 0.7)) * 4 + s.spinVel * 0.15, h)
     }
 
-    // Striker ↔ tube contacts.
-    const minStriker = CHIME.tubeRadius + CHIME.strikerRadius
+    for (let i = 0; i < P; i++) {
+      const t = s.pendants[i]
+      const [rx, rz] = PENDANT_REST[i]
+      const cx = (rx + t.x) * centrifugal
+      const cz = (rz + t.z) * centrifugal
+      integrate(t, (wx * t.drag) / t.mass + cx + bax * 1.2, (wz * t.drag) / t.mass + cz + baz * 1.2, h)
+      twistStep(s.pendantTwists[i], (wx * Math.sin(i * 2.1) + wz * Math.cos(i * 1.1)) * 6, h, 22, 2.6)
+    }
+
+    // Striker ↔ plaque contacts.
+    const minStriker = CHIME.plaqueRadius + CHIME.strikerRadius
     for (let i = 0; i < N; i++) {
-      const t = s.tubes[i]
+      const t = s.plaques[i]
       const [rx, rz] = REST[i]
-      const v = contact(striker, t, striker.x, striker.z, rx + t.x, rz + t.z, minStriker, 0.55)
+      const v = contact(striker, t, striker.x, striker.z, rx + t.x, rz + t.z, minStriker, 0.5)
       if (v >= 0) {
         if (!s.touching[i]) {
           s.touching[i] = true
-          if (v > 0.05) onStrike(i, Math.min(1, v / 1.4))
+          if (v > 0.05) {
+            onStrike(i, Math.min(1, v / 1.3))
+            s.twists[i].v += (Math.random() - 0.5) * v * 6
+          }
         }
       } else {
         s.touching[i] = false
       }
     }
 
-    // Tube ↔ tube contacts (a softer clank on both tubes).
-    const minTube = CHIME.tubeRadius * 2 + 0.01
+    // Plaque ↔ plaque contacts (a softer knock on both).
+    const minPair = CHIME.plaqueRadius * 2 + 0.02
     for (let i = 0; i < N; i++) {
       for (let j = i + 1; j < N; j++) {
-        const a = s.tubes[i]
-        const b = s.tubes[j]
+        const a = s.plaques[i]
+        const b = s.plaques[j]
         const [ax, az] = REST[i]
         const [bx, bz] = REST[j]
-        const v = contact(a, b, ax + a.x, az + a.z, bx + b.x, bz + b.z, minTube, 0.4)
+        const v = contact(a, b, ax + a.x, az + a.z, bx + b.x, bz + b.z, minPair, 0.35)
         const key = i * N + j
         if (v >= 0) {
-          if (!s.tubeTouching[key]) {
-            s.tubeTouching[key] = true
+          if (!s.pairTouching[key]) {
+            s.pairTouching[key] = true
             if (v > 0.08) {
-              onStrike(i, Math.min(0.7, v / 2))
-              onStrike(j, Math.min(0.5, v / 2.6))
+              onStrike(i, Math.min(0.6, v / 2))
+              onStrike(j, Math.min(0.45, v / 2.6))
             }
           }
         } else {
-          s.tubeTouching[key] = false
+          s.pairTouching[key] = false
         }
       }
     }
