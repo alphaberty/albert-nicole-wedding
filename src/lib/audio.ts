@@ -113,7 +113,6 @@ class ChimeAudio {
     this.lastStrike = now
     this.lastTubeStrike[tube] = now
     this.activeVoices += 1
-    backgroundMusic.duck(velocity)
 
     const base = TUBE_FREQUENCIES[tube % TUBE_FREQUENCIES.length]
     const v = Math.min(1, Math.max(0, velocity))

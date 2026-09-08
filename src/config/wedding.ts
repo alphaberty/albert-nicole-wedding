@@ -73,8 +73,8 @@ export const wedding = {
  */
 export const music = {
   src: 'audio/red-rose-white-moon.mp3',
-  /** 0–1. Keep it well under the chime so the tones stay audible. */
-  volume: 0.18,
+  /** 0–1. Set well under the chimes so both layers play together clearly. */
+  volume: 0.22,
   title: 'Red Rose, White Moon',
 }
 

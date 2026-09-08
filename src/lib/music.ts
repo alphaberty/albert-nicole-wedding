@@ -37,15 +37,6 @@ class BackgroundMusic {
       })
   }
 
-  /** Briefly lower the music so a chime strike rings through, then recover. */
-  duck(strength: number) {
-    const el = this.el
-    if (!el || el.paused) return
-    const floor = musicConfig.volume * (0.45 - 0.2 * Math.min(1, strength))
-    if (el.volume > floor) el.volume = floor
-    this.fadeTo(musicConfig.volume, 1400)
-  }
-
   setMuted(muted: boolean) {
     if (!this.el) {
       if (!muted) this.start()
