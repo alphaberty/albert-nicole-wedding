@@ -98,7 +98,8 @@ function getSheet_() {
 
 function clean_(value, max) {
   if (value === undefined || value === null) return '';
-  return String(value).replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, max);
+  var control = new RegExp('[' + String.fromCharCode(0) + '-' + String.fromCharCode(31) + String.fromCharCode(127) + ']', 'g');
+  return String(value).replace(control, '').trim().slice(0, max);
 }
 
 /** Stops spreadsheet formula injection from user-typed text. */
