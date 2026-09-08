@@ -3,9 +3,9 @@ import { useEffect, useState } from 'react'
 const SEEN_KEY = 'wedding-sound-hint-seen'
 
 /**
- * A quiet, self-dismissing note on touch devices: sound starts on the first
- * tap, but phones on silent will still play nothing. It is not a modal; it
- * never blocks anything and fades away on its own.
+ * A quiet note on touch devices: sound starts on the first tap, but phones on
+ * silent will still play nothing. It is not a modal, never blocks anything,
+ * and fades away by itself after a few seconds.
  */
 export function SoundHint() {
   const [visible, setVisible] = useState(false)
@@ -18,7 +18,7 @@ export function SoundHint() {
       /* ignore */
     }
     const show = window.setTimeout(() => setVisible(true), 900)
-    const hide = window.setTimeout(() => setVisible(false), 9000)
+    const hide = window.setTimeout(() => setVisible(false), 5500)
     return () => {
       window.clearTimeout(show)
       window.clearTimeout(hide)
@@ -42,9 +42,6 @@ export function SoundHint() {
         <path d="M19 6.2a8 8 0 0 1 0 11.6" />
       </svg>
       <span>Best with sound on. Take your phone off silent.</span>
-      <button type="button" className="sound-hint__close" aria-label="Dismiss" onClick={() => setVisible(false)}>
-        ×
-      </button>
     </div>
   )
 }
