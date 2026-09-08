@@ -20,14 +20,15 @@ function layoutFor(section: number, vw: number, vh: number): Layout {
   const hw = vw / 2
   const hh = vh / 2
   const portrait = vw < vh * 1.05
+  const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
   const corner: Placement = portrait
-    ? { x: hw * 0.5, y: hh * 0.86, s: 0.27, ry: 0.3 }
+    ? { x: hw * 0.5, y: hh * 0.86, s: clamp(vw * 0.115, 0.25, 0.36), ry: 0.3 }
     : { x: hw * 0.6, y: hh * 0.9, s: 0.55, ry: 0.2 }
 
   switch (section) {
     case SECTION.landing:
       return {
-        chime: portrait ? { x: 0, y: hh * 0.86, s: 0.5 } : { x: hw * 0.42, y: hh * 0.78, s: 0.86 },
+        chime: portrait ? { x: 0, y: hh * 0.86, s: clamp(vw * 0.22, 0.45, 0.72) } : { x: hw * 0.42, y: hh * 0.78, s: 0.86 },
         ribbon: null,
         table: null,
         flowers: portrait ? null : { x: -hw * 0.7, y: -hh * 0.72, s: 0.55, rx: 0.5 },

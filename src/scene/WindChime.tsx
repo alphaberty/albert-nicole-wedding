@@ -202,11 +202,14 @@ export function WindChime({ ambient }: Props) {
               </mesh>
               <mesh position={[0, -CHIME.sailString - 0.16, 0]} geometry={sailGeometry} material={m.redSilk} castShadow />
               {/* Small pink tile with 囍 sitting on the sail */}
-              <group position={[0, -CHIME.sailString - 0.16, 0.05]}>
-                <mesh material={m.blush}>
+              <group position={[0, -CHIME.sailString - 0.16, 0.06]}>
+                <mesh rotation={[Math.PI / 2, 0, 0]} material={m.blush}>
                   <cylinderGeometry args={[0.15, 0.15, 0.03, 32]} />
                 </mesh>
-                <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                <mesh rotation={[Math.PI / 2, 0, 0]} material={m.gold}>
+                  <torusGeometry args={[0.15, 0.008, 6, 32]} />
+                </mesh>
+                <mesh position={[0, 0, 0.02]}>
                   <planeGeometry args={[0.22, 0.22]} />
                   <meshBasicMaterial map={happy} transparent depthWrite={false} />
                 </mesh>
