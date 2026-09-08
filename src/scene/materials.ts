@@ -88,6 +88,14 @@ export function materials() {
       anisotropy: 0.65,
       anisotropyRotation: Math.PI / 2,
     }),
+    lacquer: new THREE.MeshPhysicalMaterial({
+      color: COLORS.red,
+      roughness: 0.38,
+      roughnessMap: lacquer,
+      metalness: 0.05,
+      clearcoat: 1,
+      clearcoatRoughness: 0.1,
+    }),
     redSilk: new THREE.MeshPhysicalMaterial({
       color: COLORS.red,
       roughness: 0.6,

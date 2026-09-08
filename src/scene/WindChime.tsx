@@ -276,9 +276,12 @@ export function WindChime({ ambient }: Props) {
       }
     }
     const th = threads.current
+    // Plaques and coins hang on free threads, so they settle facing the viewer
+    // however the chime has spun, with only a little twist in the air. Their
+    // lettering therefore stays readable instead of turning edge-on.
     s.plaques.forEach((t, i) => {
       const [rx, rz] = pendulumRotation(t)
-      split(th.plaques[i], rx, rz, 0.55, plaquePivots.current[i], plaqueBodies.current[i], s.twists[i].a)
+      split(th.plaques[i], rx, rz, 0.55, plaquePivots.current[i], plaqueBodies.current[i], -s.spin + s.twists[i].a * 0.35)
     })
     s.pendants.forEach((t, i) => {
       const pivot = pendantPivots.current[i]
@@ -288,7 +291,7 @@ export function WindChime({ ambient }: Props) {
         pivot.rotation.x = rx
         pivot.rotation.z = rz
       }
-      if (body) body.rotation.y = s.pendantTwists[i].a
+      if (body) body.rotation.y = -s.spin + s.pendantTwists[i].a * 0.5
     })
     {
       const [rx, rz] = pendulumRotation(s.striker)
@@ -354,8 +357,8 @@ export function WindChime({ ambient }: Props) {
                     {coin ? (
                       <>
                         <mesh rotation={[Math.PI / 2, 0, 0]} geometry={g.coin} material={m.gold} castShadow />
-                        <mesh position={[0, 0, 0.014]} geometry={g.coinFace} material={coinFace} />
-                        <mesh position={[0, 0, -0.014]} rotation={[0, Math.PI, 0]} geometry={g.coinFace} material={coinFace} />
+                        <mesh position={[0, 0, 0.016]} geometry={g.coinFace} material={coinFace} />
+                        <mesh position={[0, 0, -0.016]} rotation={[0, Math.PI, 0]} geometry={g.coinFace} material={coinFace} />
                       </>
                     ) : (
                       <>
@@ -387,9 +390,9 @@ export function WindChime({ ambient }: Props) {
                     }}
                   >
                     <mesh position={[0, 0.01, 0]} geometry={g.plaqueLoop} material={m.gold} />
-                    <mesh position={[0, -h / 2 - 0.04, 0]} geometry={g.plaques[i]} material={m.red} castShadow />
-                    <mesh position={[0, -h / 2 - 0.04, 0.037]} geometry={g.plaqueFaces[i]} material={plaqueFaces[i]} />
-                    <mesh position={[0, -h / 2 - 0.04, -0.037]} rotation={[0, Math.PI, 0]} geometry={g.plaqueFaces[i]} material={plaqueFaces[i]} />
+                    <mesh position={[0, -h / 2 - 0.04, 0]} geometry={g.plaques[i]} material={m.lacquer} castShadow />
+                    <mesh position={[0, -h / 2 - 0.04, 0.046]} geometry={g.plaqueFaces[i]} material={plaqueFaces[i]} />
+                    <mesh position={[0, -h / 2 - 0.04, -0.046]} rotation={[0, Math.PI, 0]} geometry={g.plaqueFaces[i]} material={plaqueFaces[i]} />
                     <mesh position={[0, -h - 0.1, 0]} geometry={g.bead} material={m.gold} />
                     <mesh position={[0, -h - 0.25, 0]} geometry={g.tassel} material={m.redSilk} castShadow />
                   </group>

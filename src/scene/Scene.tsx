@@ -32,7 +32,7 @@ function layoutFor(section: number, vw: number, vh: number, pxWidth: number): La
     switch (section) {
       case SECTION.landing:
         return {
-          chime: { x: 0, y: hh * 0.86, s: clamp(vw * 0.22, 0.45, 0.72) },
+          chime: { x: 0, y: hh * 0.84, s: clamp(vw * 0.28, 0.5, 0.8) },
           ribbon: null,
           table: null,
           flowers: null,
