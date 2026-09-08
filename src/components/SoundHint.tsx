@@ -41,7 +41,7 @@ export function SoundHint() {
         <path d="M16.5 8.8a4.5 4.5 0 0 1 0 6.4" />
         <path d="M19 6.2a8 8 0 0 1 0 11.6" />
       </svg>
-      <span>Best with sound on. Switch your phone off silent for the chimes.</span>
+      <span>Best with sound on. Take your phone off silent.</span>
       <button type="button" className="sound-hint__close" aria-label="Dismiss" onClick={() => setVisible(false)}>
         ×
       </button>
