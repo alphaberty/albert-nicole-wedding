@@ -61,7 +61,7 @@ export const wedding = {
   dressCode: 'Smart casual · Garden Monet-inspired hues',
   /** Landing page welcome copy. */
   welcome:
-    'We’d love to share a garden evening with you. Before the day, please tell us what you’d like for dinner and whether you’d stay on for the after-party.',
+    'We’re looking forward to having you there on the big day. Before then, please tell us what you’d like for dinner and whether you’d stay on for the after-party.',
   /** Optional. When set it is shown on the landing and review screens, e.g. 'Please respond by 1 October 2026'. */
   responseDeadline: undefined as string | undefined,
 }
