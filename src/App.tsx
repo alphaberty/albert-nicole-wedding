@@ -107,22 +107,26 @@ function Experience() {
     return () => window.removeEventListener('pointermove', onMove)
   }, [])
 
-  // Sound is on by default. Browsers only allow audio after a user gesture, so
-  // it starts silently on the first tap, click or key press anywhere.
+  // Sound is on by default. Browsers only allow audio after a user gesture,
+  // and iOS Safari only accepts touchend / click / key events for that, so we
+  // try on each of those until the audio context is really running.
   useEffect(() => {
+    const events: (keyof WindowEventMap)[] = ['touchend', 'click', 'keydown', 'pointerup']
+    const off = () => events.forEach((e) => window.removeEventListener(e, unlock))
     const unlock = () => {
-      void chimeAudio.enable()
-      window.removeEventListener('pointerdown', unlock)
-      window.removeEventListener('keydown', unlock)
-      window.removeEventListener('touchend', unlock)
+      void chimeAudio.enable().then(() => {
+        if (chimeAudio.ready) off()
+      })
     }
-    window.addEventListener('pointerdown', unlock, { passive: true })
-    window.addEventListener('keydown', unlock)
-    window.addEventListener('touchend', unlock, { passive: true })
+    events.forEach((e) => window.addEventListener(e, unlock, { passive: true }))
+    // Coming back to the tab after a call or a lock-screen pause.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void chimeAudio.enable()
+    }
+    document.addEventListener('visibilitychange', onVisible)
     return () => {
-      window.removeEventListener('pointerdown', unlock)
-      window.removeEventListener('keydown', unlock)
-      window.removeEventListener('touchend', unlock)
+      off()
+      document.removeEventListener('visibilitychange', onVisible)
     }
   }, [])
 

@@ -28,8 +28,6 @@ const TUBE_MIN_GAP = 0.16
 class ChimeAudio {
   private ctx: AudioContext | null = null
   private master: GainNode | null = null
-  /** Keeps the media-element sink alive (see enable()). */
-  private sink: HTMLAudioElement | null = null
   private listeners = new Set<() => void>()
   private state: AudioState = { enabled: false, muted: false }
   private lastStrike = -1
@@ -50,9 +48,17 @@ class ChimeAudio {
     this.listeners.forEach((fn) => fn())
   }
 
-  /** Must be called from a user gesture (click / tap). Safe to call repeatedly. */
+  /** True once the browser has actually let the audio context run. */
+  get ready(): boolean {
+    return this.ctx !== null && this.ctx.state === 'running'
+  }
+
+  /**
+   * Must be called from a user gesture. iOS Safari only honours touchend,
+   * click and key events, and may need several attempts (e.g. after an
+   * interruption), so this is safe to call repeatedly until `ready` is true.
+   */
   async enable() {
-    if (this.state.enabled && this.ctx?.state === 'running') return
     backgroundMusic.start()
     if (!this.ctx) {
       const Ctor =
@@ -68,47 +74,17 @@ class ChimeAudio {
       this.master = this.ctx.createGain()
       this.master.gain.value = MASTER_LEVEL
       this.master.connect(compressor)
-      this.route(compressor)
+      compressor.connect(this.ctx.destination)
     }
-    try {
-      await this.ctx.resume()
-    } catch {
-      /* ignore */
+    if (this.ctx.state !== 'running') {
+      try {
+        await this.ctx.resume()
+      } catch {
+        /* not allowed yet; the next gesture will try again */
+      }
     }
-    this.emit({ enabled: true, muted: false })
-  }
-
-  /**
-   * Play the synthesised chimes through a media element rather than straight
-   * to the context output. On iPhones the ring/silent switch mutes plain Web
-   * Audio but not media playback, so without this the background track would
-   * play while the chimes vanished. Falls back to the direct output if the
-   * element refuses to play.
-   */
-  private route(node: AudioNode) {
-    const ctx = this.ctx
-    if (!ctx || typeof ctx.createMediaStreamDestination !== 'function') {
-      node.connect(ctx!.destination)
-      return
-    }
-    try {
-      const streamOut = ctx.createMediaStreamDestination()
-      const el = new Audio()
-      el.srcObject = streamOut.stream
-      el.setAttribute('playsinline', '')
-      node.connect(streamOut)
-      this.sink = el
-      el.play().catch(() => {
-        try {
-          node.disconnect(streamOut)
-        } catch {
-          /* ignore */
-        }
-        node.connect(ctx.destination)
-        this.sink = null
-      })
-    } catch {
-      node.connect(ctx.destination)
+    if (this.ctx.state === 'running' && !this.state.enabled) {
+      this.emit({ enabled: true, muted: false })
     }
   }
 
@@ -116,7 +92,6 @@ class ChimeAudio {
     if (!this.ctx || !this.master) return
     const muted = !this.state.muted
     this.master.gain.setTargetAtTime(muted ? 0 : MASTER_LEVEL, this.ctx.currentTime, 0.03)
-    if (this.sink) this.sink.muted = muted
     backgroundMusic.setMuted(muted)
     this.emit({ muted })
   }
